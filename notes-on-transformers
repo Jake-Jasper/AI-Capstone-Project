@@ -1,0 +1,21 @@
+## Notes of Transformers
+
+Click on the model link to find the original detail of the model..
+
+#### all-MiniLM-L6-v2
+
+Details about training here - https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+
+took 13 mins to finish all embeddings for first test.
+
+#### All-mpnet-base-v2
+
+https://huggingface.co/sentence-transformers/all-mpnet-base-v2
+
+Biiger embedding size (786), based on different pre-trained model
+
+Above had exact same scores but this one took a few mins longer.
+
+#### MIxedBread
+
+https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1
