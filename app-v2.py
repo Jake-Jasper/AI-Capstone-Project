@@ -6,6 +6,9 @@ from gpt4all import GPT4All
 import cohere
 from config import Keys
 
+## to do
+## make clear screen button and user-feedback
+
 
 DB = "12-4-24-all-mini-token-100.db"
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
@@ -93,19 +96,21 @@ def generate(question, candidates):
     # some reason it gives blank text if I pass in all data...
     cand = candidates.split("\n\n")
 
-    prompt_temp = f"""### System:
-        You are an AI Assistant that helps to answer questions as best you can and incorporate user input.
-        ### User:
-        {question}
-        
-        ### System:
-        Based on the retrieved information from the pdf, here are the relevant excerpts:
-        
-        {cand[0]}
-        
-        Please answer the user's question, integrating insights from these excerpts and your general knowledge. Limit your answer to Three sentences in the form of a paragraph.
-        ### Response:
-        """
+    default_ans = gen_model.generate(prompt=question, temp=0)
+
+    prompt_temp = f"""The original query is as follows: {question}
+    We have provided an existing answer: {default_ans}
+
+    We have the opportunity to refine the existing answer (only if needed) with some more context below.
+    ------------
+
+    {cand[0]}
+
+    ------------
+     Given the new context, refine the original answer to better answer the query. If the context isn't useful, return the original answer.
+
+     Refined Answer:
+     """
     if len(candidates) == 0:
         prompt_temp = question
     #print(prompt_temp)
@@ -115,28 +120,48 @@ def generate(question, candidates):
     #print(ans)
     return ans
 
+def feedback(rd, rgt, at, fg):
+    # fix this then add database and done....
+    print(rd, rgt, at, fg)
 
 with gr.Blocks() as demo:
+    demo.title = "WRAP Doc Chat"
     with gr.Row():
         with gr.Column():
-            question = gr.Textbox(label="Ask a Question")
+            question = gr.Textbox(label="Ask a Question", placeholder="How should I store Bananas?")
             submit_q_btn = gr.Button(value="Submit")
         with gr.Column():
             retrieved = gr.Textbox(label="Retrieved text")
             from_docs = gr.Textbox(label="Relevant documents")
-    # generate answer
-    with gr.Row():
-        with gr.Column():
-            generate_btn = gr.Button(value=f"Generate question answer using {gen_model_name}")
-        with gr.Column():
-            answer = gr.Textbox(label="Generated text")
-    ## make feedback here
+    
+    with gr.Tabs():
+        with gr.TabItem("Generate Content"):
+            with gr.Row():
+                with gr.Column():
+                    generate_btn = gr.Button(value=f"Generate answer to question using {gen_model_name}")
+                with gr.Column():
+                    answer = gr.Textbox(label="Generated text")
+        with gr.TabItem("Feedback"):
+            with gr.Row():
+                gr.Textbox(value="here is how to scoring works")
+            with gr.Row():
+                rd = gr.Slider(1,10,5,label="Relevance of documents", interactive=True)
+            with gr.Row():
+                rgt = gr.Slider(1,10,5,label="Relevance of generated text", interactive=True)
+            with gr.Row():
+                at = gr.Slider(1,10,5,label="Adherance to text", interactive=True)
+            with gr.Row():
+                fg = gr.Slider(1,10,5,label="Faithfullnes of generated text", interactive=True)
+            with gr.Column():
+                    submit_fbk_btn = gr.Button(value="Submit Feedback")
 
 
     # button to search db
     submit_q_btn.click(meta, inputs = question, outputs=[from_docs, retrieved])
-    # button to generate text
+    # generate answer
     generate_btn.click(generate, inputs = [question, retrieved], outputs=[answer])
-    
-    
-demo.launch()
+    # submit feedback
+    submit_fbk_btn.click(feedback)
+        
+        
+demo.launch(auth=("", ""))
