@@ -5,9 +5,13 @@ import numpy as np
 from gpt4all import GPT4All
 import cohere
 from config import Keys
+from openai import OpenAI
+
 
 ## to do
+## Add selection box for model
 ## make clear screen button and user-feedback
+## add default question so can't be empty
 
 
 DB = "12-4-24-all-mini-token-100.db"
@@ -15,6 +19,8 @@ model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 gen_model = GPT4All("orca-mini-3b-gguf2-q4_0.gguf")
 co = cohere.Client(Keys.cohere)
 gen_model_name = "orca-mini"
+OPENAI_API_KEY=Keys.openAI
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # find best docs
 def find_top_k_relevance(question=["No question"], model=None, n=20, db=DB):
@@ -82,7 +88,7 @@ def meta(question):
     top_k = find_top_k_relevance(question=question, model=model)
     docs, candidates = get_relevant_docs(top_k, question)
     newline = "\n\n"
-    # format returned strings
+    # format returned strings   
     if docs == "No relevant documents found":
         return docs, candidates
     else:    
@@ -92,33 +98,64 @@ def meta(question):
     return docs, candidates
 
 
+
 def generate(question, candidates):
-    # some reason it gives blank text if I pass in all data...
+    default_ans = None
     cand = candidates.split("\n\n")
 
-    default_ans = gen_model.generate(prompt=question, temp=0)
-
     prompt_temp = f"""The original query is as follows: {question}
-    We have provided an existing answer: {default_ans}
+                We have provided an existing answer: {default_ans}
 
-    We have the opportunity to refine the existing answer (only if needed) with some more context below.
-    ------------
+                We have the opportunity to refine the existing answer (only if needed) with some more context below.
+                ------------
 
-    {cand[0]}
+                {cand[0]}
 
-    ------------
-     Given the new context, refine the original answer to better answer the query. If the context isn't useful, return the original answer.
+                ------------
+                Given the new context, refine the original answer to better answer the query. If the context isn't useful, return the original answer.
 
-     Refined Answer:
-     """
+                Refined Answer:
+                """
+    # if there are no additional context just return 
     if len(candidates) == 0:
-        prompt_temp = question
-    #print(prompt_temp)
-    #ans = gen_model.generate_text(prompt=prompt_temp, temp=0)
-    # gpt4all
-    ans = gen_model.generate(prompt=prompt_temp, temp=0)
-    #print(ans)
-    return ans
+            prompt_temp = question
+
+    default = client.chat.completions.create(
+    model="gpt-3.5-turbo-0125",
+    messages=[
+        {"role": "system", "content": "You are an AI assistant, you are skilled at answering queries for people writing literature reviews."},
+        {"role": "user", "content": question}
+    ],
+    max_tokens=300
+    )
+    default_ans = default.choices[0].message.content
+
+    ## Incorporate docs
+    context_ans = client.chat.completions.create(
+    model="gpt-3.5-turbo-0125",
+    messages=[
+        {"role": "system", "content": "You are an AI assistant, you are skilled at answering queries for people writing literature reviews."},
+        {"role": "user", "content": prompt_temp}
+    ],
+    max_tokens=300
+    
+    )
+
+    return context_ans.choices[0].message.content
+
+        #orca-mini
+        # default_ans = gen_model.generate(prompt=question, temp=0)
+
+        # if len(candidates) == 0:
+        #     prompt_temp = question
+        # #print(prompt_temp)
+        # #ans = gen_model.generate_text(prompt=prompt_temp, temp=0)
+        # # gpt4all
+        # ans = gen_model.generate(prompt=prompt_temp, temp=0)
+        # #print(ans)
+        # return ans
+
+    
 
 def feedback(rd, rgt, at, fg):
     # fix this then add database and done....
@@ -138,7 +175,8 @@ with gr.Blocks() as demo:
         with gr.TabItem("Generate Content"):
             with gr.Row():
                 with gr.Column():
-                    generate_btn = gr.Button(value=f"Generate answer to question using {gen_model_name}")
+                    with gr.Row():
+                        generate_btn = gr.Button(value=f"Generate answer")
                 with gr.Column():
                     answer = gr.Textbox(label="Generated text")
         with gr.TabItem("Feedback"):
