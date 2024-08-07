@@ -1,1 +1,1 @@
-### Repository for storing example scripts fro AI capstone project
+### Repository for storing example scripts for AI capstone project
